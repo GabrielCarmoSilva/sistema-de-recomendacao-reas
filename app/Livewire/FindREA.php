@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Http;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Revolution\Google\Sheets\Facades\Sheets;
+use App\Jobs\ProcessAquarela;
+use App\Jobs\ProcessMecRed;
+use App\Models\Data;
 
 class FindREA extends Component
 {
@@ -43,8 +46,6 @@ class FindREA extends Component
 
     public array $reas = [];
 
-    public array $institutions = [];
-
     public ?string $userType = null;
 
     private array $interestOptions = [
@@ -55,11 +56,6 @@ class FindREA extends Component
     ];
 
     public string $interestApiSearch = '';
-
-    public function mount()
-    {
-        $this->getInstitutions();
-    }
 
     public function selectUserType(?string $type = null)
     {
@@ -115,16 +111,6 @@ class FindREA extends Component
         $this->showMessage = true;
     }
 
-    public function getInstitutions()
-    {
-        $getrange = 'Pagina1!A:B';
-
-        $this->institutions = Sheets::spreadsheet(config('google.institutions_spreadsheet_id'))
-            ->sheet(config('google.institutions_sheet_id'))
-            ->range($getrange)
-            ->all();
-    }
-
     public function search()
     {
         $this->validate();
@@ -166,10 +152,6 @@ class FindREA extends Component
         $this->loading = true;
 
         $this->findAdequateTerm();
-        
-        $search = Http::get(config('app.aquarela.api') . '?string=' . $this->interestApiSearch . '&size=50')->json()['reas'];
-
-        $this->reas = [];
 
         $types = [];
 
@@ -179,128 +161,11 @@ class FindREA extends Component
 
         $types[] = 'livro digital';
 
-        foreach ($search as $rea) {
-            $reachedLevel = false;
+        Data::query()->delete();
 
-            if (
-                (stripos($rea['descricao'], 'criança') !== false || 
-                stripos($rea['descricao'], 'infantil') !== false ||
-                stripos($rea['titulo'], 'criança') !== false ||
-                stripos($rea['titulo'], 'infantil') !== false)) {
-                    $reachedLevel = true;
+        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile);
 
-                    if ($this->sanitizeSearch($this->profile) === 'educacao infantil' && 
-                        in_array($this->sanitizeSearch($rea['tipoConteudo']), $types)) {
-                        $this->reas[] = [
-                            'title' => $rea['titulo'],
-                            'link'  => $rea['links'][0]['href'],
-                            'type'  => $rea['tipoConteudo'],
-                            'repositorio' => 'Aquarela'
-                        ];
-                    }
-                }
-            
-            if (
-                (stripos($rea['descricao'], 'fundamental') !== false ||
-                stripos($rea['descricao'], 'sexto ano') !== false ||
-                stripos($rea['descricao'], '6º') !== false ||
-                stripos($rea['descricao'], 'sétimo ano') !== false ||
-                stripos($rea['descricao'], '7º') !== false ||
-                stripos($rea['descricao'], 'oitavo ano') !== false ||
-                stripos($rea['descricao'], '8º') !== false ||
-                stripos($rea['descricao'], 'nono ano') !== false ||
-                stripos($rea['descricao'], '9º') !== false ||
-                str_contains($rea['descricao'], 'EF') ||
-                stripos($rea['titulo'], 'fundamental') !== false ||
-                str_contains($rea['titulo'], 'EF')))  {
-                    $reachedLevel = true;
-
-                    if ($this->sanitizeSearch($this->profile) === 'ensino fundamental' && 
-                        in_array($this->sanitizeSearch($rea['tipoConteudo']), $types)) {
-                        $this->reas[] = [
-                            'title' => $rea['titulo'],
-                            'link'  => $rea['links'][0]['href'],
-                            'type'  => $rea['tipoConteudo'],
-                            'repositorio' => 'Aquarela'
-                        ];
-                    }
-                }
-            
-            if (
-                (stripos($rea['descricao'], 'médio') !== false ||
-                stripos($rea['titulo'], 'médio') !== false)) {
-                    if ($this->sanitizeSearch($this->profile) === 'ensino medio' && 
-                        in_array($this->sanitizeSearch($rea['tipoConteudo']), $types)) {
-                        $reachedLevel = true;
-
-                        $this->reas[] = [
-                            'title' => $rea['titulo'],
-                            'link'  => $rea['links'][0]['href'],
-                            'type'  => $rea['tipoConteudo'],
-                            'repositorio' => 'Aquarela'
-                        ];
-                    }
-                }
-            
-            if (!$reachedLevel) {
-                if ($this->sanitizeSearch($this->profile) === 'ensino superior' && 
-                    in_array($this->sanitizeSearch($rea['tipoConteudo']), $types)) {
-                    $this->reas[] = [
-                        'title' => $rea['titulo'],
-                        'link'  => $rea['links'][0]['href'],
-                        'type'  => $rea['tipoConteudo'],
-                        'repositorio' => 'Aquarela'
-                    ];
-                }
-            }
-        }
-
-        $search = Http::get(config('app.mecred.api') . '?page=0&results_per_page=500&query=' . $this->interestApiSearch . '&search_class=LearningObject&order=score')->json();
-
-        foreach ($search as $rea) {
-            $names = array_map(function($stage) {
-                return $this->sanitizeSearch($stage['name']);
-            }, $rea['educational_stages']);
-
-            foreach ($names as $name) {
-                if ($this->sanitizeSearch($this->profile) === 'educacao infantil' && str_contains($name, 'educacao infantil') && 
-                    in_array($this->sanitizeSearch($rea['object_type']), $types)) {
-                    $this->reas[] = [
-                        'title' => $rea['name'],
-                        'type'  => $rea['object_type'],
-                        'repositorio' => 'MECRED',
-                    ];
-                }
-
-                if ($this->sanitizeSearch($this->profile) === 'ensino fundamental' && str_contains($name, 'ensino fundamental') && 
-                    in_array($this->sanitizeSearch($rea['object_type']), $types)) {
-                    $this->reas[] = [
-                        'title' => $rea['name'],
-                        'type'  => $rea['object_type'],
-                        'repositorio' => 'MECRED',
-                    ];
-                }
-
-                if ($this->sanitizeSearch($this->profile) === 'ensino medio' && str_contains($name, 'ensino medio') && 
-                    in_array($this->sanitizeSearch($rea['object_type']), $types)) {
-                    $this->reas[] = [
-                        'title' => $rea['name'],
-                        'type'  => $rea['object_type'],
-                        'repositorio' => 'MECRED',
-                    ];
-                }
-
-                if ($this->sanitizeSearch($this->profile) === 'ensino superior' && str_contains($name, 'ensino superior') && 
-                    in_array($this->sanitizeSearch($rea['object_type']), $types)) {
-                    $this->reas[] = [
-                        'title' => $rea['name'],
-                        'type'  => $rea['object_type'],
-                        'repositorio' => 'MECRED',
-                    ];
-                
-                }
-            }
-        }
+        ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest);
 
         $this->loading = false;
     }

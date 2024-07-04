@@ -7,8 +7,10 @@
     "require": {
         "php": "^8.2",
         "laravel/framework": "^11.0",
+        "laravel/horizon": "^5.24",
         "laravel/tinker": "^2.9",
         "livewire/livewire": "^3.4",
+        "predis/predis": "2.0",
         "revolution/laravel-google-sheets": "^6.3"
     },
     "require-dev": {
