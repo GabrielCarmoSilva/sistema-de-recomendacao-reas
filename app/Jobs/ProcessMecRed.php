@@ -16,7 +16,7 @@ class ProcessMecRed implements ShouldQueue
 
     public string $search;
     
-    public Data $data;
+    public $time;
 
     public array $types;
 
@@ -27,7 +27,7 @@ class ProcessMecRed implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct($search, $types, $profile, $interest)
+    public function __construct($search, $types, $profile, $interest, $time)
     {
         $this->search = $search;
 
@@ -36,6 +36,8 @@ class ProcessMecRed implements ShouldQueue
         $this->profile = $profile;
 
         $this->interest = $interest;
+
+        $this->time = $time;
     }
 
     /**
@@ -56,7 +58,7 @@ class ProcessMecRed implements ShouldQueue
                 array_map(function ($stage) use ($rea) {
                     if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile) && 
                         in_array($this->sanitizeSearch($rea['object_type']), $this->types)) {
-                        $model = Data::orderBy('id', 'desc')->first();
+                        $model = Data::query()->where('searched_at', $this->time)->first();
 
                         $data = json_decode($model->data);
 
@@ -74,7 +76,7 @@ class ProcessMecRed implements ShouldQueue
             $page++;
         }
 
-        $model = Data::orderBy('id', 'desc')->first();
+        $model = Data::query()->where('searched_at', $this->time)->first();
 
         $model->update(['finished' => true]);
     }

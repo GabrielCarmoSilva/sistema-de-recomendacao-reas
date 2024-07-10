@@ -9,6 +9,7 @@ use Revolution\Google\Sheets\Facades\Sheets;
 use App\Jobs\ProcessAquarela;
 use App\Jobs\ProcessMecRed;
 use App\Models\Data;
+use App\Models\Collaborator;
 
 class FindREA extends Component
 {
@@ -46,6 +47,8 @@ class FindREA extends Component
 
     public array $reas = [];
 
+    public $timestampSession;
+
     public ?string $userType = null;
 
     private array $interestOptions = [
@@ -70,41 +73,47 @@ class FindREA extends Component
 
         $this->validate();
 
-        $getrange = 'Pagina1!A:F';
+        Collaborator::create([
+            'name'        => $this->name,
+            'role'        => $this->role,
+            'institution' => $this->institution,
+        ]);
 
-        $collaboratorsrange = 'Folha1!A:C';
+        // $getrange = 'Pagina1!A:F';
 
-        $values = Sheets::spreadsheet(config('google.post_spreadsheet_id'))
-            ->sheet(config('google.post_sheet_id'))
-            ->range($getrange)
-            ->all();
+        // $collaboratorsrange = 'Folha1!A:C';
 
-        $id = count($values);
+        // $values = Sheets::spreadsheet(config('google.post_spreadsheet_id'))
+        //     ->sheet(config('google.post_sheet_id'))
+        //     ->range($getrange)
+        //     ->all();
 
-        Sheets::spreadsheet(config('google.collaborators_spreadsheet_id'))
-            ->sheet(config('google.collaborators_sheet_id'))
-            ->range($collaboratorsrange)
-            ->append([
-                [
-                    $this->name,
-                    $this->role,
-                    $this->institution,
-                ],
-            ]);
+        // $id = count($values);
 
-        Sheets::spreadsheet(config('google.post_spreadsheet_id'))
-            ->sheet(config('google.post_sheet_id'))
-            ->range($getrange)
-            ->append([
-                [
-                    $id,
-                    $this->reference,
-                    $this->reaTitle,
-                    $this->sanitizeSearch($this->interest),
-                    $this->sanitizeSearch($this->profile),
-                    $this->sanitizeSearch($this->item),
-                ],
-            ], 'RAW');
+        // Sheets::spreadsheet(config('google.collaborators_spreadsheet_id'))
+        //     ->sheet(config('google.collaborators_sheet_id'))
+        //     ->range($collaboratorsrange)
+        //     ->append([
+        //         [
+        //             $this->name,
+        //             $this->role,
+        //             $this->institution,
+        //         ],
+        //     ]);
+
+        // Sheets::spreadsheet(config('google.post_spreadsheet_id'))
+        //     ->sheet(config('google.post_sheet_id'))
+        //     ->range($getrange)
+        //     ->append([
+        //         [
+        //             $id,
+        //             $this->reference,
+        //             $this->reaTitle,
+        //             $this->sanitizeSearch($this->interest),
+        //             $this->sanitizeSearch($this->profile),
+        //             $this->sanitizeSearch($this->item),
+        //         ],
+        //     ], 'RAW');
 
         $this->reset('profile', 'interest', 'name', 'role', 'institution', 'reaTitle', 'reference', 'item');
 
@@ -114,6 +123,8 @@ class FindREA extends Component
     public function search()
     {
         $this->validate();
+
+        $this->timestampSession = now();
 
         $getrange = 'Pagina1!A:F';
 
@@ -157,15 +168,17 @@ class FindREA extends Component
 
         foreach ($this->sheet as $line) {
             $types[] = $line[5];
+
+            if ($line[5] === 'e-book') {
+                $types[] = 'livro digital';
+            }
         }
 
-        $types[] = 'livro digital';
+        Data::create(['searched_at' => $this->timestampSession]);
 
-        Data::query()->delete();
+        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession);
 
-        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile);
-
-        ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest);
+        ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession);
 
         $this->loading = false;
     }

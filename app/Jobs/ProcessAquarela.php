@@ -16,7 +16,7 @@ class ProcessAquarela implements ShouldQueue
 
     public string $search;
     
-    public Data $data;
+    public $time;
 
     public array $types;
 
@@ -25,13 +25,15 @@ class ProcessAquarela implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct($search, $types, $profile)
+    public function __construct($search, $types, $profile, $time)
     {
         $this->search = $search;
 
         $this->types = $types;
 
         $this->profile = $profile;
+
+        $this->time = $time;
     }
 
     /**
@@ -121,7 +123,9 @@ class ProcessAquarela implements ShouldQueue
             }
         }
 
-        Data::create(['data' => json_encode($data)]);
+        $model = Data::query()->where('searched_at', $this->time)->first();
+
+        $model->update(['data' => json_encode($data)]);
     }
 
     private function sanitizeSearch(string $search)

@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Data extends Model
+class Collaborator extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'data',
-        'searched_at',
-        'finished',
+        'name',
+        'role',
+        'institution',
     ];
 }
