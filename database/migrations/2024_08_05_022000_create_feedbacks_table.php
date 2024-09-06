@@ -11,12 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('data', function (Blueprint $table) {
+        Schema::create('feedbacks', function (Blueprint $table) {
             $table->id();
-            $table->json('data')->nullable();
-            $table->boolean('finished')->default(false);
-            $table->timestamp('searched_at');
-            $table->double('time')->default(0);
+            $table->text('feedback');
             $table->timestamps();
         });
     }
@@ -26,6 +23,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('data');
+        Schema::dropIfExists('feedbacks');
     }
 };

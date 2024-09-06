@@ -2,17 +2,23 @@
 
 namespace App\Livewire;
 
-use Illuminate\Support\Facades\Http;
-use Livewire\Attributes\Validate;
-use Livewire\Component;
-use Revolution\Google\Sheets\Facades\Sheets;
-use App\Jobs\ProcessAquarela;
-use App\Jobs\ProcessMecRed;
 use App\Models\Data;
+use Livewire\Component;
+use App\Models\Feedback;
+use App\Models\Searches;
+use App\Jobs\ProcessMecRed;
 use App\Models\Collaborator;
+use Livewire\WithPagination;
+use App\Jobs\ProcessAquarela;
+use Livewire\Attributes\Validate;
+use Illuminate\Support\Facades\Http;
+use Revolution\Google\Sheets\Facades\Sheets;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class FindREA extends Component
 {
+    use WithPagination;
+
     #[Validate('required', message: 'O perfil é obrigatório.')]
     public string $profile;
 
@@ -37,13 +43,14 @@ class FindREA extends Component
     #[Validate('required_if:userType,==,colaborador', message: 'O item é obrigatório.')]
     public string $item;
 
+    #[Validate('max:4096', message: 'Por favor adicione uma mensagem de no máximo 4096 caracteres.')]
+    public string $message;
+
     public bool $showMessage = false;
 
     public bool $loading = false;
 
     public array $sheet = [];
-
-    public array $header = [];
 
     public array $reas = [];
 
@@ -60,11 +67,100 @@ class FindREA extends Component
 
     public string $interestApiSearch = '';
 
+    public $charCount = 0;
+
+    public int $page = 1;
+
+    public function updatedMessage($value)
+    {
+        $this->charCount = strlen($value);
+    }
+
+    public function mount()
+    {
+        $collaboratorsInterests = collect(Collaborator::lazyById(100, $column = 'id'))
+            ->map(function ($collaborator) {
+                return [
+                    $collaborator->interest
+                ];
+            });
+
+        $this->interestOptions = array_merge($this->interestOptions, $collaboratorsInterests->all());
+    }
+
     public function selectUserType(?string $type = null)
     {
         $this->userType = $type;
 
         $this->showMessage = false;
+    }
+
+    public function prevPage()
+    {
+        if ($this->page === 1) {
+            return;
+        }
+
+        $this->page--;
+    }
+
+    public function nextPage()
+    {
+        $this->page++;
+    }
+
+    public function paginate($data)
+    {
+        if (!isset($data->data)) {
+            return;
+        }
+
+        $both = [];
+        $profile = [];
+        $interest = [];
+
+        foreach (json_decode($data->data) as $rea) {
+            if ($rea->recommended === 'both') {
+                $both[] = $rea;
+            } else if ($rea->recommended === 'profile') {
+                $profile[] = $rea;
+            } 
+            else {
+                $interest[] = $rea;
+            }
+        }
+
+        $sortedData = array_merge($both, $profile, $interest);
+
+        $items = collect($sortedData);
+        $total = $items->count();
+    
+        return new LengthAwarePaginator(
+            $items->forPage($this->page, 10),
+            $total,
+            10,
+            $this->page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+    }
+
+    public function sendFeedback()
+    {
+        $this->validate(
+            ['message' => 'max:4096|required'],
+            ['message.required' => 'O campo de mensagem é obrigatório.',
+            'message.max' => 'A mensagem não pode ter mais que 4096 caracteres.']
+        );
+
+        $this->showMessage = false;
+
+        Feedback::create([
+            'feedback' => $this->message,
+        ]);
+
+        $this->reset('message');
+
+        $this->showMessage = true;
     }
 
     public function insert()
@@ -77,6 +173,11 @@ class FindREA extends Component
             'name'        => $this->name,
             'role'        => $this->role,
             'institution' => $this->institution,
+            'reference'   => $this->reference,
+            'rea_title'   => $this->reaTitle,
+            'interest'    => $this->sanitizeSearch($this->interest),
+            'profile'     => $this->sanitizeSearch($this->profile),
+            'item'        => $this->sanitizeSearch($this->item),
         ]);
 
         // $getrange = 'Pagina1!A:F';
@@ -126,14 +227,26 @@ class FindREA extends Component
 
         $this->timestampSession = now();
 
+        Searches::create([
+            'interest'    => $this->sanitizeSearch($this->interest),
+            'profile'     => $this->sanitizeSearch($this->profile),
+        ]);
+
         $getrange = 'Pagina1!A:F';
 
-        $values = Sheets::spreadsheet(config('google.post_spreadsheet_id'))
-            ->sheet(config('google.post_sheet_id'))
-            ->range($getrange)
-            ->all();
+        $collaborators = collect(Collaborator::lazyById(100, $column = 'id'))
+            ->map(function ($collaborator) {
+                return [
+                    $collaborator->id,
+                    $collaborator->reference,
+                    $collaborator->rea_title,
+                    $collaborator->interest,
+                    $collaborator->profile,
+                    $collaborator->item
+                ];
+            });
 
-        $this->header = $values[0];
+        $values = $collaborators->all();
 
         $this->sheet = array_filter(
             $values, 
@@ -173,6 +286,15 @@ class FindREA extends Component
                 $types[] = 'livro digital';
             }
         }
+
+        $collaboratorsTypes = collect(Collaborator::lazyById(100, $column = 'id'))
+            ->map(function ($collaborator) {
+                return [
+                    $collaborator->item
+                ];
+            });
+
+        $types = array_merge($types, $collaboratorsTypes->all());
 
         Data::create(['searched_at' => $this->timestampSession]);
 

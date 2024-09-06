@@ -13,5 +13,6 @@ class Data extends Model
         'data',
         'searched_at',
         'finished',
+        'time',
     ];
 }

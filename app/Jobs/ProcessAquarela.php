@@ -41,91 +41,154 @@ class ProcessAquarela implements ShouldQueue
      */
     public function handle()
     {
-        $total = Http::get(config('app.aquarela.api') . '?string=' . $this->search)->json()['paginacao']['totalElements'];
-
-        $search = Http::get(config('app.aquarela.api') . '?string=' . $this->search . '&size=' . $total)->json()['reas'];
-
+        $start_time = microtime(true); 
+        
+        $page = 0;
+        
         $data = [];
 
-        foreach ($search as $rea) {
-            $reachedLevel = false;
+        $model = Data::query()->where('searched_at', $this->time)->first();
 
-            if (
-                (stripos($rea['descricao'], 'criança') !== false || 
-                stripos($rea['descricao'], 'infantil') !== false ||
-                stripos($rea['titulo'], 'criança') !== false ||
-                stripos($rea['titulo'], 'infantil') !== false)) {
-                    $reachedLevel = true;
+        while (true) {
+            $search = Http::withOptions(['verify' => false])->get(config('app.aquarela.api') . '?string=' . $this->search . '&page=' . $page)->json()['reas'];
 
-                    if ($this->sanitizeSearch($this->profile) === 'educacao infantil' && 
-                        in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
-                        $data[] = [
-                            'title' => $rea['titulo'],
-                            'link'  => $rea['links'][0]['href'],
-                            'type'  => $rea['tipoConteudo'],
-                            'repositorio' => 'Aquarela'
-                        ];
-                    }
-                }
-            
-            if (
-                (stripos($rea['descricao'], 'fundamental') !== false ||
-                stripos($rea['descricao'], 'sexto ano') !== false ||
-                stripos($rea['descricao'], '6º') !== false ||
-                stripos($rea['descricao'], 'sétimo ano') !== false ||
-                stripos($rea['descricao'], '7º') !== false ||
-                stripos($rea['descricao'], 'oitavo ano') !== false ||
-                stripos($rea['descricao'], '8º') !== false ||
-                stripos($rea['descricao'], 'nono ano') !== false ||
-                stripos($rea['descricao'], '9º') !== false ||
-                str_contains($rea['descricao'], 'EF') ||
-                stripos($rea['titulo'], 'fundamental') !== false ||
-                str_contains($rea['titulo'], 'EF')))  {
-                    $reachedLevel = true;
+            $page++;
 
-                    if ($this->sanitizeSearch($this->profile) === 'ensino fundamental' && 
-                        in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
-                        $data[] = [
-                            'title' => $rea['titulo'],
-                            'link'  => $rea['links'][0]['href'],
-                            'type'  => $rea['tipoConteudo'],
-                            'repositorio' => 'Aquarela'
-                        ];
-                    }
-                }
-            
-            if (
-                (stripos($rea['descricao'], 'médio') !== false ||
-                stripos($rea['titulo'], 'médio') !== false)) {
-                    if ($this->sanitizeSearch($this->profile) === 'ensino medio' && 
-                        in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
+            if (count($search) === 0) {
+                break;
+            }
+
+            foreach ($search as $rea) {
+                $reachedLevel = false;
+    
+                if (
+                    (stripos($rea['descricao'], 'criança') !== false || 
+                    stripos($rea['descricao'], 'infantil') !== false ||
+                    stripos($rea['titulo'], 'criança') !== false ||
+                    stripos($rea['titulo'], 'infantil') !== false)) {
                         $reachedLevel = true;
 
+                        $recommended = '';
+
+                        if ($this->sanitizeSearch($this->profile) === 'educacao infantil' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
+                            $recommended = 'both';
+                        }
+                        else if ($this->sanitizeSearch($this->profile) === 'educacao infantil') {
+                            $recommended = 'profile';
+                        }
+                        else {
+                            $recommended = 'interest';
+                        }
+    
                         $data[] = [
                             'title' => $rea['titulo'],
                             'link'  => $rea['links'][0]['href'],
                             'type'  => $rea['tipoConteudo'],
-                            'repositorio' => 'Aquarela'
+                            'repositorio' => 'Aquarela',
+                            'recommended' => $recommended,
                         ];
                     }
-                }
-            
-            if (!$reachedLevel) {
-                if ($this->sanitizeSearch($this->profile) === 'ensino superior' && 
-                    in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
+                
+                if (
+                    (stripos($rea['descricao'], 'fundamental') !== false ||
+                    stripos($rea['descricao'], 'sexto ano') !== false ||
+                    stripos($rea['descricao'], '6º') !== false ||
+                    stripos($rea['descricao'], 'sétimo ano') !== false ||
+                    stripos($rea['descricao'], '7º') !== false ||
+                    stripos($rea['descricao'], 'oitavo ano') !== false ||
+                    stripos($rea['descricao'], '8º') !== false ||
+                    stripos($rea['descricao'], 'nono ano') !== false ||
+                    stripos($rea['descricao'], '9º') !== false ||
+                    str_contains($rea['descricao'], 'EF') ||
+                    stripos($rea['titulo'], 'fundamental') !== false ||
+                    str_contains($rea['titulo'], 'EF')))  {
+                        $reachedLevel = true;
+
+                        $recommended = '';
+
+                        if ($this->sanitizeSearch($this->profile) === 'ensino fundamental' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
+                            $recommended = 'both';
+                        }
+                        else if ($this->sanitizeSearch($this->profile) === 'ensino fundamental') {
+                            $recommended = 'profile';
+                        }
+                        else {
+                            $recommended = 'interest';
+                        }
+
+                        $data[] = [
+                            'title' => $rea['titulo'],
+                            'link'  => $rea['links'][0]['href'],
+                            'type'  => $rea['tipoConteudo'],
+                            'repositorio' => 'Aquarela',
+                            'recommended' => $this->sanitizeSearch($this->profile) === 'ensino fundamental' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types),
+                        ];
+                    }
+                
+                if (
+                    (stripos($rea['descricao'], 'médio') !== false ||
+                    stripos($rea['titulo'], 'médio') !== false)) {
+                        $reachedLevel = true;
+
+                        $recommended = '';
+
+                        if ($this->sanitizeSearch($this->profile) === 'ensino medio' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
+                            $recommended = 'both';
+                        }
+                        else if ($this->sanitizeSearch($this->profile) === 'ensino medio') {
+                            $recommended = 'profile';
+                        }
+                        else {
+                            $recommended = 'interest';
+                        }
+    
+                        $data[] = [
+                            'title' => $rea['titulo'],
+                            'link'  => $rea['links'][0]['href'],
+                            'type'  => $rea['tipoConteudo'],
+                            'repositorio' => 'Aquarela',
+                            'recommended' => $this->sanitizeSearch($this->profile) === 'ensino medio' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types),
+                        ];
+                    }
+                
+                if (!$reachedLevel) {
+                    $recommended = '';
+
+                    if ($this->sanitizeSearch($this->profile) === 'ensino superior' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)) {
+                        $recommended = 'both';
+                    }
+                    else if ($this->sanitizeSearch($this->profile) === 'ensino superior') {
+                        $recommended = 'profile';
+                    }
+                    else {
+                        $recommended = 'interest';
+                    }
+
                     $data[] = [
                         'title' => $rea['titulo'],
                         'link'  => $rea['links'][0]['href'],
                         'type'  => $rea['tipoConteudo'],
-                        'repositorio' => 'Aquarela'
+                        'repositorio' => 'Aquarela',
+                        'recommended' => $this->sanitizeSearch($this->profile) === 'ensino superior' && in_array($this->sanitizeSearch($rea['tipoConteudo']), $this->types)
                     ];
                 }
             }
+
+            if ($model->data !== null) {
+                $decodedData = json_decode($model->data);
+                $decodedData = array_merge($decodedData, $data);
+            
+                $model->update(['data' => json_encode($decodedData)]);
+            } else {
+                $model->update(['data' => json_encode($data)]);
+            }
         }
 
-        $model = Data::query()->where('searched_at', $this->time)->first();
+        $end_time = microtime(true); 
+  
+        $execution_time = ($end_time - $start_time); 
 
-        $model->update(['data' => json_encode($data)]);
+        $model->update(['time' => $execution_time]);
     }
 
     private function sanitizeSearch(string $search)

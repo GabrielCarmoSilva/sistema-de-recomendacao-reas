@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title>Laravel</title>
+        <title>SisREAd</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
@@ -17,14 +17,28 @@
         </style>
     </head>
     <body class="font-sans antialiased">
-        <div class="flex flex-col mx-auto px-32 py-16 gap-y-8 max-w-7xl">
-            <div class="flex items-center">
-                <img src="{{ asset('assets/img/ufjf.png') }}" class="w-24 h-24 object-cover">
+        <div class="flex">
+            <div class="hidden md:flex flex-col min-h-screen w-32 md:w-56 items-center bg-zinc-100">
+                <span class="font-bold mt-64">Pesquisas mais acessadas</span>
+                <div class="flex flex-col gap-y-2 px-2">
+                    @foreach(\App\Models\Searches::select('profile', 'interest', \Illuminate\Support\Facades\DB::raw('count(*) as total'))->orderBy('total', 'DESC')->groupBy(['profile', 'interest'])->get() as $search)
+                        <span>
+                            {{ $search->interest }}, {{ $search->profile }} ({{ $search->total }})
+                        </span>
+                    @endforeach
+                </div>
             </div>
-            <div class="flex justify-center">
-                <img src="{{ asset('assets/img/logo.png') }}" class="w-96 object-cover">
+            <div class="flex flex-col py-16 gap-y-8 w-full">
+                <div class="flex items-center gap-x-4 px-4">
+                    <img src="{{ asset('assets/img/ufjf.png') }}" class="w-24 h-24 object-cover">
+                    <img src="{{ asset('assets/img/logo-utfpr.png') }}" class="w-24 h-24">
+                </div>
+                <div class="flex flex-col self-center justify-center">
+                    <h1 class="text-7xl font-bold text-center text-emerald-700">SisREAd</h1>
+                    <span class="font-semibold text-lg">Sistema de Recomendação para REA</span>
+                </div>
+                <livewire:find-r-e-a />
             </div>
-            <livewire:find-r-e-a />
         </div>
     </body>
 </html>

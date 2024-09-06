@@ -45,10 +45,16 @@ class ProcessMecRed implements ShouldQueue
      */
     public function handle()
     {
+        $start_time = microtime(true); 
+
         $page = 0;
 
+        $data = [];
+
+        $model = Data::query()->where('searched_at', $this->time)->first();
+
         while (true) {
-            $search = Http::get(config('app.mecred.api') . '?page=' . $page . '&results_per_page=250&query=' . $this->search . '&search_class=LearningObject&order=score')->json();
+            $search = Http::withOptions(['verify' => false])->get(config('app.mecred.api') . '?page=' . $page . '&query=' . $this->search . '&search_class=LearningObject&order=score')->json();
 
             if (count($search) === 0) {
                 break;
@@ -56,29 +62,45 @@ class ProcessMecRed implements ShouldQueue
 
             array_map(function ($rea) {
                 array_map(function ($stage) use ($rea) {
-                    if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile) && 
-                        in_array($this->sanitizeSearch($rea['object_type']), $this->types)) {
-                        $model = Data::query()->where('searched_at', $this->time)->first();
+                    $model = Data::query()->where('searched_at', $this->time)->first();
 
-                        $data = json_decode($model->data);
+                    $data = json_decode($model->data);
 
-                        $data[] = [
-                            'title' => $rea['name'],
-                            'type'  => $rea['object_type'],
-                            'repositorio' => 'MECRED',
-                        ];
+                    $recommended = '';
 
-                        $model->update(['data' => $data]);
+                    if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile) && in_array($this->sanitizeSearch($rea['object_type']), $this->types)) {
+                        $recommended = 'both';
                     }
+                    else if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile)) {
+                        $recommended = 'profile';
+                    }
+                    else {
+                        $recommended = 'interest';
+                    }
+
+                    $data[] = [
+                        'title' => $rea['name'],
+                        'type'  => $rea['object_type'],
+                        'link'  => $rea['link'],
+                        'repositorio' => 'MECRED',
+                        'id'          => $rea['id'],
+                        'recommended' => $recommended,
+                    ];
+
+                    $model->update(['data' => $data]);
                 }, $rea['educational_stages']);
             }, $search);
 
             $page++;
         }
 
-        $model = Data::query()->where('searched_at', $this->time)->first();
+        $time = $model->time;
 
-        $model->update(['finished' => true]);
+        $end_time = microtime(true); 
+  
+        $execution_time = ($end_time - $start_time); 
+
+        $model->update(['finished' => true, 'time' => $time + $execution_time]);
     }
 
     private function sanitizeSearch(string $search)

@@ -16,6 +16,11 @@ return new class extends Migration
             $table->string('name');
             $table->string('role');
             $table->string('institution');
+            $table->string('rea_title');
+            $table->string('reference');
+            $table->string('profile');
+            $table->string('interest');
+            $table->string('item');
             $table->timestamps();
         });
     }
