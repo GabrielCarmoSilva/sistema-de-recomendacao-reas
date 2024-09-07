@@ -1,0 +1,16 @@
+{
+    "name": "laravel",
+    "builds": [
+      {
+        "src": "start-queue.php",
+        "use": "@railway/worker"
+      }
+    ],
+    "workers": [
+      {
+        "src": "start-queue.php",
+        "name": "queue-worker"
+      }
+    ]
+  }
+  
