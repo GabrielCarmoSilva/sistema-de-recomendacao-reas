@@ -12,4 +12,4 @@ Schedule::call(function () {
     if (!Str::contains(Shell::exec('ps aux | grep "queue:work"'), 'artisan queue:work')) {
         Artisan::call('queue:work');
     }
-})->everyTenSeconds();
+})->everyThirtySeconds()->withoutOverlapping();
