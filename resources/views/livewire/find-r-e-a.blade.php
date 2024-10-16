@@ -120,7 +120,7 @@
                             @else
                                 <div class="flex flex-col gap-y-4 mt-4">
                                     <span class="font-semibold text-gray-700">
-                                        Acurácia: {{ $this->paginate($data)->total() }}
+                                        Número de REA retornados na busca: {{ $this->paginate($data)->total() }}
                                     </span>
                                     <span class="font-semibold text-gray-700">
                                         Eficiência: {{ $data->time === 0 ? 0 : round($this->paginate($data)->total() / ($data->time), 2) }}
