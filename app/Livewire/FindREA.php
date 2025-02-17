@@ -225,8 +225,8 @@ class FindREA extends Component
     {
         $this->validate();
 
-        $this->timestampSession = now();
-
+        $this->timestampSession = now()->setTimezone('UTC');
+        
         Searches::create([
             'interest'    => $this->sanitizeSearch($this->interest),
             'profile'     => $this->sanitizeSearch($this->profile),
