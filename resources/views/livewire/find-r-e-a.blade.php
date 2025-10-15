@@ -41,6 +41,7 @@
                 <div wire:poll.keep-alive>
                     @if (\App\Models\Data::count() > 0)
                         @php
+                            
                             $data = \App\Models\Data::query()->where('searched_at', $this->timestampSession)->first();
                         @endphp
                         @if ($data)
@@ -51,6 +52,11 @@
                                         <th scope="col" class="px-6 py-3">@lang('Título')</th>
                                         <th scope="col" class="px-6 py-3">@lang('Item')</th>
                                         <th scope="col" class="px-6 py-3">@lang('Repositório')</th>
+                                        <th scope="col" class="px-6 py-3">@lang('Tipo de Interatividade')</th>
+                                        <th scope="col" class="px-6 py-3">@lang('Nível de Interatividade')</th>
+                                        <th scope="col" class="px-6 py-3">@lang('Estilo de Aprendizagem')</th>
+                                        <th scope="col" class="px-6 py-3">@lang('Estratégia')</th>
+                                        <th scope="col" class="px-6 py-3">@lang('Meta')
                                         <th scope="col" class="px-6 py-3">@lang('Link')</th>
                                     </tr>
                                 </thead>
@@ -65,7 +71,7 @@
                                             @endphp
                                             <tr @class([
                                                 "bg-white border-b",
-                                                "bg-yellow-50" => $rea->recommended === 'both'
+                                                "bg-yellow-50" => auth()->user() ? $rea->recommended === 'meta' : $rea->recommended === 'both'
                                             ])>
                                                 <td class="px-6 py-4">
                                                     {{ $rea->title }}
@@ -75,6 +81,23 @@
                                                 </td>
                                                 <td class="px-6 py-4">
                                                     {{ $rea->repositorio }}
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    {{ $rea->interatividade }}
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    {{ $rea->nivel_interatividade }}
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    {{ $rea->estilo_aprendizagem }}
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    {{ $rea->estrategia }}
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    @if ($rea->recommended === 'meta')
+                                                        Indicado para a sua meta de aprendizagem
+                                                    @endif
                                                 </td>
                                                 @if (isset($rea->link) || isset($rea->id))
                                                     <td class="px-6 py-4">
@@ -298,5 +321,56 @@
                 @lang('Deixe seu feedback')
             </button>
         </div>
+        @if(!auth()->check())
+            <div class="flex items-center flex-col justify-center w-full px-8">
+                <a href="{{ route('login') }}">
+                    <button 
+                        type="button" 
+                        class="text-white max-w-36 bg-emerald-600 hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2">
+                        @lang('Login')
+                    </button>
+                </a>
+                <a href="{{ route('register') }}">
+                    <button
+                        type="button"
+                        class="text-white max-w-36 bg-emerald-600 hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2">
+                        @lang('Registrar')
+                    </button>
+                </a>
+            </div>
+        @else
+            <div class="flex items-center flex-col justify-center w-full px-8">
+                <span class="font-semibold text-lg">
+                    {{ auth()->user()->name }}
+                </span>
+                @if(!auth()->user()->questionnaire)
+                    <a href="{{ route('emapre') }}">
+                        <button 
+                            type="button" 
+                            class="text-white max-w-36 bg-emerald-600 hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2">
+                            @lang('Responda o questionário')
+                        </button>
+                    </a>
+                @else
+                    @if(auth()->user()->questionnaire->dominant === 'mpe')
+                        <span class="font-semibold text-lg">
+                            Meta Performance-Evitação
+                        </span>
+                    @elseif(auth()->user()->questionnaire->dominant === 'ma')
+                        <span class="font-semibold text-lg">
+                            Meta Aprender
+                        </span>
+                    @elseif(auth()->user()->questionnaire->dominant === 'mpa')
+                        <span class="font-semibold text-lg">
+                            Meta Performance-Aproximação
+                        </span>
+                    @else
+                        <span class="font-semibold text-lg">
+                            Nenhuma meta determinada
+                        </span> 
+                    @endif
+                @endif
+            </div>
+        @endif
     @endif
 </div>

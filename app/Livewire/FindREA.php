@@ -115,12 +115,15 @@ class FindREA extends Component
             return;
         }
 
+        $meta = [];
         $both = [];
         $profile = [];
         $interest = [];
 
         foreach (json_decode($data->data) as $rea) {
-            if ($rea->recommended === 'both') {
+            if ($rea->recommended === 'meta') {
+                $meta[] = $rea;
+            } elseif ($rea->recommended === 'both') {
                 $both[] = $rea;
             } else if ($rea->recommended === 'profile') {
                 $profile[] = $rea;
@@ -130,7 +133,7 @@ class FindREA extends Component
             }
         }
 
-        $sortedData = array_merge($both, $profile, $interest);
+        $sortedData = array_merge($meta, $both, $profile, $interest);
 
         $items = collect($sortedData);
         $total = $items->count();
@@ -298,9 +301,9 @@ class FindREA extends Component
 
         Data::create(['searched_at' => $this->timestampSession]);
 
-        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession);
+        ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
-        ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession);
+        //ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession);
 
         $this->loading = false;
     }

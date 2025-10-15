@@ -47,18 +47,16 @@ class ProcessMecRed implements ShouldQueue
     {
         $start_time = microtime(true); 
 
-        $page = 0;
+        $offset = 0;
 
         $data = [];
 
         $model = Data::query()->where('searched_at', $this->time)->first();
 
-        while (true) {
-            $search = Http::withOptions(['verify' => false])->get(config('app.mecred.api') . '?page=' . $page . '&query=' . $this->search . '&search_class=LearningObject&order=score')->json();
+        while ($offset <= 120) {
+            $search = Http::withOptions(['verify' => false])->get(getMecRedURL(str_replace(" ", "+", $this->search), $offset))->json();
 
-            if (count($search) === 0) {
-                break;
-            }
+            $offset += 30;
 
             array_map(function ($rea) {
                 array_map(function ($stage) use ($rea) {
@@ -67,6 +65,10 @@ class ProcessMecRed implements ShouldQueue
                     $data = json_decode($model->data);
 
                     $recommended = '';
+                    $interactivity = '';
+                    $interactivity_level = '';
+                    $learning_style = '';
+                    $strategy = '';
 
                     if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile) && in_array($this->sanitizeSearch($rea['object_type']), $this->types)) {
                         $recommended = 'both';
@@ -78,10 +80,40 @@ class ProcessMecRed implements ShouldQueue
                         $recommended = 'interest';
                     }
 
+                    if (in_array($rea['object_type'], ['Jogo', 'Experimento prático', 'Trilha de aprendizagem', 'Exercício', 'Simulação', 'Resolução de problemas'])) {
+                        $interactivity = 'Ativo';
+                        $interactivity_level = 'Alto / Muito alto';
+                        $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
+                        $strategy = 'Ativa / Abstrata / Visual/Verbal';
+                    }
+                    else if (in_array($rea['object_type'], ['Vídeo', 'Texto', 'Animação', 'Livro digital', 'Hipertexto', 'Áudio', 'Imagem', 'Slide'])) {
+                        $interactivity = 'Expositivo';
+                        $interactivity_level = 'Baixo / Muito baixo';
+                        $learning_style = 'Sensorial / Reflexivo / Auditivo/Visual';
+                        $strategy = 'Passiva / Concreta / Visual/Verbal';
+                    }
+                    else if ($rea['object_type'] === 'Hipermídia') {
+                        $interactivity = 'Misto';
+                        $interactivity_level = 'Médio';
+                        $learning_style = 'Intuitivo/Sensorial / Ativo/Reflexivo / Auditivo/Visual';
+                        $strategy = 'Passiva / Concreta / Visual/Verbal';
+                    }
+                    else {
+                        $interactivity = 'Não especificado';
+                        $interactivity_level = 'Não especificado';
+                        $learning_style = 'Não especificado';
+                        $strategy = 'Não especificado';
+                    }
+                    
+
                     $data[] = [
                         'title' => $rea['name'],
                         'type'  => $rea['object_type'],
                         'link'  => $rea['link'],
+                        'interatividade' => $interactivity,
+                        'nivel_interatividade' => $interactivity_level,
+                        'estilo_aprendizagem' => $learning_style,
+                        'estrategia' => $strategy,
                         'repositorio' => 'MECRED',
                         'id'          => $rea['id'],
                         'recommended' => $recommended,
