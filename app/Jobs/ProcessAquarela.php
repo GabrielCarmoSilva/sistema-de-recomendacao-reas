@@ -207,20 +207,6 @@ Metas:
 Responda com uma única palavra: "Aprendizagem", "Performance Aproximação", "Performance Evitação". Caso seja mais de uma, especifique a que mais se aproxima.
 PROMPT;
 
-        //$response = Http::withHeaders([
-        //    'Authorization' => 'Bearer ' . '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',
-        //    'Content-Type' => 'application/json',
-        //])->post('https://router.huggingface.co/novita/v3/openai/chat/completions', [
-        //    'messages' => [
-        //        [
-        //            'role' => 'user',
-        //            'content' => $prompt,
-        //        ]
-        //    ],
-        //    'model' => 'mistralai/mistral-7b-instruct',
-        //    'stream' => false
-        //]);
-
         $response = Http::timeout(60)->post("http://127.0.0.1:11434/api/generate", [
             'model' => 'llama3.2',
             'prompt' => $prompt,
