@@ -24,10 +24,12 @@ class ProcessMecRed implements ShouldQueue
 
     public string $interest;
 
+    public ?string $meta;
+
     /**
      * Create a new job instance.
      */
-    public function __construct($search, $types, $profile, $interest, $time)
+    public function __construct($search, $types, $profile, $interest, $time, $meta)
     {
         $this->search = $search;
 
@@ -38,6 +40,8 @@ class ProcessMecRed implements ShouldQueue
         $this->interest = $interest;
 
         $this->time = $time;
+
+        $this->meta = $meta;
     }
 
     /**
@@ -54,76 +58,65 @@ class ProcessMecRed implements ShouldQueue
         $model = Data::query()->where('searched_at', $this->time)->first();
 
         while ($offset <= 120) {
-            $search = Http::withOptions(['verify' => false])->get(getMecRedURL(str_replace(" ", "+", $this->search), $offset))->json();
+            $search = Http::withOptions(['verify' => false])->get(getMecRedURL(str_replace(" ", "+", $this->search), $offset, $this->profile, $this->meta))->json();
 
             $offset += 30;
 
-            array_map(function ($rea) {
-                array_map(function ($stage) use ($rea) {
-                    $model = Data::query()->where('searched_at', $this->time)->first();
+            if (count($search) === 0) {
+                break;
+            }
 
-                    $data = json_decode($model->data);
+            $recommended = 'both';
 
-                    $recommended = '';
-                    $interactivity = '';
-                    $interactivity_level = '';
-                    $learning_style = '';
-                    $strategy = '';
+            if ($this->meta) {
+                $recommended = 'meta';
+            }
 
-                    if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile) && in_array($this->sanitizeSearch($rea['object_type']), $this->types)) {
-                        $recommended = 'both';
-                    }
-                    else if ($this->sanitizeSearch($stage['name']) === $this->sanitizeSearch($this->profile)) {
-                        $recommended = 'profile';
-                    }
-                    else {
-                        $recommended = 'interest';
-                    }
+            $interactivity = 'Não especificado';
+            $interactivity_level = 'Não especificado';
+            $learning_style = 'Não especificado';
+            $strategy = 'Não especificado';
 
-                    if (in_array($rea['object_type'], ['Jogo', 'Experimento prático', 'Trilha de aprendizagem', 'Exercício', 'Simulação', 'Resolução de problemas'])) {
-                        $interactivity = 'Ativo';
-                        $interactivity_level = 'Alto / Muito alto';
-                        $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
-                        $strategy = 'Ativa / Abstrata / Visual/Verbal';
-                    }
-                    else if (in_array($rea['object_type'], ['Vídeo', 'Texto', 'Animação', 'Livro digital', 'Hipertexto', 'Áudio', 'Imagem', 'Slide'])) {
-                        $interactivity = 'Expositivo';
-                        $interactivity_level = 'Baixo / Muito baixo';
-                        $learning_style = 'Sensorial / Reflexivo / Auditivo/Visual';
-                        $strategy = 'Passiva / Concreta / Visual/Verbal';
-                    }
-                    else if ($rea['object_type'] === 'Hipermídia') {
-                        $interactivity = 'Misto';
-                        $interactivity_level = 'Médio';
-                        $learning_style = 'Intuitivo/Sensorial / Ativo/Reflexivo / Auditivo/Visual';
-                        $strategy = 'Passiva / Concreta / Visual/Verbal';
-                    }
-                    else {
-                        $interactivity = 'Não especificado';
-                        $interactivity_level = 'Não especificado';
-                        $learning_style = 'Não especificado';
-                        $strategy = 'Não especificado';
-                    }
-                    
+            if ($this->meta && ($this->meta === 'ma' || $this->meta === 'mpa')) {
+                $interactivity = 'Ativo';
+                $interactivity_level = 'Alto / Muito alto';
+                $learning_style = 'Intuitivo / Ativo / Auditivo/Visual';
+                $strategy = 'Ativa / Abstrata / Visual/Verbal';
+            } elseif ($this->meta && $this->meta === 'mpe') {
+                $interactivity = 'Expositivo';
+                $interactivity_level = 'Baixo / Muito baixo';
+                $learning_style = 'Sensorial / Reflexivo / Auditivo/Visual';
+                $strategy = 'Passiva / Concreta / Visual/Verbal';
+            }
 
-                    $data[] = [
-                        'title' => $rea['name'],
-                        'type'  => $rea['object_type'],
-                        'link'  => $rea['link'],
-                        'interatividade' => $interactivity,
-                        'nivel_interatividade' => $interactivity_level,
-                        'estilo_aprendizagem' => $learning_style,
-                        'estrategia' => $strategy,
-                        'repositorio' => 'MECRED',
-                        'id'          => $rea['id'],
-                        'recommended' => $recommended,
-                    ];
+            $interactivityData = [
+                'interatividade' => $interactivity,
+                'nivel_interatividade' => $interactivity_level,
+                'estilo_aprendizagem' => $learning_style,
+                'estrategia' => $strategy,
+            ];
 
-                    $model->update(['data' => $data]);
-                }, $rea['educational_stages']);
-            }, $search);
+            foreach ($search as $rea) {
+                $data[] = array_merge([
+                    'title' => $rea['name'],
+                    'link' => '',
+                    'type' => '',
+                    'repositorio' => 'MECRED',
+                    'recommended' => $recommended,
+                    'titulo' => $rea['name'],
+                    'descricao' => '',
+                    'tipoConteudo' => '',
+                    'dtype' => '',
+                ], $interactivityData);
+            }
 
-            $page++;
+            if ($model->data !== null) {
+                $decodedData = json_decode($model->data);
+                $decodedData = array_merge($decodedData, $data);
+                $model->update(['data' => json_encode($decodedData)]);
+            } else {
+                $model->update(['data' => json_encode($data)]);
+            }
         }
 
         $time = $model->time;

@@ -7,6 +7,7 @@ use Livewire\Component;
 use App\Models\Feedback;
 use App\Models\Searches;
 use App\Jobs\ProcessMecRed;
+use App\Jobs\ProcessEduplay;
 use App\Models\Collaborator;
 use Livewire\WithPagination;
 use App\Jobs\ProcessAquarela;
@@ -303,7 +304,9 @@ class FindREA extends Component
 
         ProcessAquarela::dispatch($this->interestApiSearch, $types, $this->profile, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
-        //ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession);
+        ProcessMecRed::dispatch($this->interestApiSearch, $types, $this->profile, $this->interest, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
+
+        ProcessEduplay::dispatch($this->interestApiSearch, $this->timestampSession, auth()->user()?->questionnaire?->dominant);
 
         $this->loading = false;
     }
